@@ -197,8 +197,8 @@
         }
 
         if (downloadUrl) {
-            // If there's a valid download URL, download that.
-            browser.downloads.download({ url: downloadUrl });
+            // If there's a valid download URL, open in a new tab.
+            browser.tabs.create({ url: downloadUrl });
         } else {
             // ...otherwise open a new tab for the update page.
             browser.tabs.create({
