@@ -127,15 +127,14 @@ type ExtensionMessageDefinitions = {
  */
 type BridgeMessageDefinitions = {
     /**
-     * First message sent by the extension to the bridge.
-     * Includes extension version string. Responds directly with version
-     * string of the bridge to compare.
+     * First message sent by the extension to the bridge.Responds directly with
+     * version string of the bridge to compare.
      *
-     * Still uses `:/` message separator for compat talking to older
-     * bridge versions.
+     * Still uses `:/` message separator for compat talking to older bridge
+     * versions.
      */
-    "bridge:getInfo": string;
-    "bridge:/getInfo": string;
+    "bridge:getInfo": undefined;
+    "bridge:/getInfo": undefined;
 
     /**
      * Tells a bridge to begin service discovery (and whether to

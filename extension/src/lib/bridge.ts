@@ -69,7 +69,7 @@ const getInfo = () =>
 
             applicationVersion = await nativeMessaging.sendNativeMessage(
                 applicationName,
-                { subject: "bridge:/getInfo", data: version }
+                { subject: "bridge:/getInfo" }
             );
         } catch (err) {
             if (err === 401) {
