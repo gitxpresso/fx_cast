@@ -7,7 +7,7 @@ import url from "url";
 import { spawnSync } from "child_process";
 
 import mustache from "mustache";
-import pkg from "pkg";
+import pkg from "@yao-pkg/pkg";
 import yargs from "yargs";
 
 import config from "./lib/config.js";
