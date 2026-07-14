@@ -171,6 +171,33 @@
             }
         };
     }
+
+    // --- NEW: ADVANCED MEDIA CONTROL FUNCTIONS ---
+    function setPlaybackRate(ev: Event) {
+        const target = ev.currentTarget as HTMLSelectElement;
+        const rate = parseFloat(target.value);
+        browser.tabs.query({ active: true, currentWindow: true }).then(tabs => {
+            if (tabs[0]?.id) {
+                browser.tabs.sendMessage(tabs[0].id, { subject: "cast:setPlaybackRate", data: { rate } });
+            }
+        });
+    }
+
+    function triggerPiP() {
+        browser.tabs.query({ active: true, currentWindow: true }).then(tabs => {
+            if (tabs[0]?.id) {
+                browser.tabs.sendMessage(tabs[0].id, { subject: "cast:triggerPiP" });
+            }
+        });
+    }
+
+    function cycleAudioSink() {
+        browser.tabs.query({ active: true, currentWindow: true }).then(tabs => {
+            if (tabs[0]?.id) {
+                browser.tabs.sendMessage(tabs[0].id, { subject: "cast:setAudioSink" });
+            }
+        });
+    }
 </script>
 
 <div class="media">
@@ -359,18 +386,10 @@
                             ? _("popupMediaUnmute")
                             : _("popupMediaMute")}
                         on:click={() => {
-                            /**
-                             * If not muted and volume is at 0, max out
-                             * volume instead of flipping mute value.
-                             */
                             if (!volume.muted && volume.level === 0) {
-                                dispatch("volumeChanged", {
-                                    level: 1
-                                });
+                                dispatch("volumeChanged", { level: 1 });
                             } else {
-                                dispatch("volumeChanged", {
-                                    muted: !volume.muted
-                                });
+                                dispatch("volumeChanged", { muted: !volume.muted });
                             }
                         }}
                     />
@@ -390,6 +409,39 @@
                     />
                 </div>
             {/if}
+        </div>
+
+        <!-- ADVANCED CONTROLS (Speed, PiP, Audio Sink) -->
+        <div style="display: flex; gap: 8px; margin-top: 5px; justify-content: center; align-items: center; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px;">
+            <select 
+                class="ghost" 
+                style="font-size: 11px; padding: 2px 5px; background: transparent; color: inherit; border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; cursor: pointer;" 
+                on:change={setPlaybackRate}
+            >
+                <option value="0.5" style="color: #000;">0.5x</option>
+                <option value="1" style="color: #000;" selected>1.0x</option>
+                <option value="1.25" style="color: #000;">1.25x</option>
+                <option value="1.5" style="color: #000;">1.5x</option>
+                <option value="2" style="color: #000;">2.0x</option>
+            </select>
+
+            <button 
+                class="ghost" 
+                style="font-size: 11px; padding: 2px 8px; border: 1px solid rgba(255,255,255,0.2); border-radius: 4px;" 
+                title="Picture in Picture"
+                on:click={triggerPiP}
+            >
+                PiP
+            </button>
+            
+            <button 
+                class="ghost" 
+                style="font-size: 11px; padding: 2px 8px; border: 1px solid rgba(255,255,255,0.2); border-radius: 4px;" 
+                title="Cycle Audio Output"
+                on:click={cycleAudioSink}
+            >
+                Audio Source
+            </button>
         </div>
     </div>
 </div>

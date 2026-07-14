@@ -1,0 +1,3 @@
+search feature interferes with custom url, and drop down from file manager doesnt work, plus local files dont work either, and I don't know what pip does, and the audio splitting is suppose o be for if audio from computer redirects to the tv rather than the speaksers from the laptop
+
+please provide revamp, and features, + more to make the perfect revampfork of fx_cast

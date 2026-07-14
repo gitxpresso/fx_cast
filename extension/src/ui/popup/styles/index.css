@@ -488,3 +488,153 @@ body {
     font-weight: 600;
     letter-spacing: 0.3px;
 }
+
+/* --- ADVANCED CAST DASHBOARD UI --- */
+.advanced-cast-dashboard {
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    background-color: rgba(0,0,0,0.15);
+    border-top: 1px solid #333344;
+    width: 100%;
+    box-sizing: border-box;
+    border-bottom-left-radius: 10px;
+    border-bottom-right-radius: 10px;
+}
+
+.dashboard-header {
+    font-size: 11px;
+    text-transform: uppercase;
+    color: #888;
+    font-weight: bold;
+    letter-spacing: 0.5px;
+    margin-bottom: -4px;
+}
+
+.dashboard-section {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.section-title {
+    font-size: 12px;
+    color: #ccc;
+    font-weight: 600;
+}
+
+.input-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.custom-input {
+    flex: 1;
+    background-color: #1a1a24;
+    border: 1px solid #444455;
+    color: #fff;
+    padding: 6px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    outline: none;
+}
+
+.custom-input:focus {
+    border-color: #6262b5;
+}
+
+.file-upload-btn {
+    background-color: #333344;
+    border: 1px solid #444455;
+    border-radius: 4px;
+    padding: 4px 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.2s;
+}
+
+.file-upload-btn:hover {
+    background-color: #444455;
+}
+
+.cast-action-btn {
+    background-color: #4a4a8f;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 6px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.cast-action-btn:hover:not(:disabled) {
+    background-color: #6262b5;
+}
+
+.cast-action-btn:disabled {
+    background-color: #333344;
+    color: #777;
+    cursor: not-allowed;
+}
+
+.toggle-section {
+    border-top: 1px solid #333344;
+    padding-top: 10px;
+    gap: 12px;
+}
+
+.toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: normal !important;
+    cursor: pointer;
+    color: #ddd;
+}
+
+.action-buttons-row {
+    display: flex;
+    gap: 8px;
+}
+
+.pip-btn {
+    flex: 1;
+    background-color: rgba(255,255,255,0.05);
+    border: 1px solid #555577;
+    color: #ccc;
+    padding: 6px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.pip-btn:hover {
+    background-color: rgba(255,255,255,0.1);
+    color: #fff;
+}
+
+.smart-btn {
+    flex: 1;
+    background-color: rgba(255,255,255,0.05);
+    border: 1px solid #555577;
+    color: #ccc;
+    padding: 6px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.smart-btn:hover {
+    background-color: rgba(255,255,255,0.1);
+}
+
+.smart-btn.active {
+    background-color: #e50914 !important;
+    border-color: #ff3344;
+    color: white;
+    font-weight: bold;
+}

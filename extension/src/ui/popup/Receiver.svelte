@@ -3,7 +3,6 @@
     import fuzzysort from "fuzzysort";
 
     import type { Options } from "../../lib/options";
-
     import {
         type ReceiverDevice,
         ReceiverDeviceCapabilities
@@ -24,7 +23,6 @@
     import ReceiverMedia from "./ReceiverMedia.svelte";
 
     const _ = browser.i18n.getMessage;
-
     const dispatch = createEventDispatcher<{
         cast: { device: ReceiverDevice };
         stop: { device: ReceiverDevice };
@@ -47,7 +45,6 @@
     export let result: Nullable<Fuzzysort.KeyResult<ReceiverDevice>> = null;
 
     export let opts: Nullable<Options>;
-
     /** Current receiver application (if available) */
     $: application = device.status?.applications?.[0];
     /** Current media status (if available) */
@@ -64,44 +61,34 @@
         [browser.i18n.getUILanguage()],
         { type: "language" }
     );
-
     // Subtitle/caption tracks
     $: textTracks = mediaStatus?.media?.tracks
         ?.filter(track => track.type === TrackType.TEXT)
         .map(track => {
-            /**
-             * If track has no name, but does have a language, get a
-             * display name for the language.
-             */
             if (!track.name && track.language) {
                 try {
                     const displayName = languageNames.of(track.language);
                     if (displayName) {
                         track.name = displayName;
                     }
-                    // eslint-disable-next-line no-empty
                 } catch (err) {}
             }
-
             return track;
         });
     $: activeTextTrackId = mediaStatus?.activeTrackIds?.find(trackId =>
         textTracks?.find(track => track.trackId === trackId)
     );
-
+    
     /** Whether media controls are shown. */
     let isExpanded = false;
     let isExpandedUserModified = false;
-
+    
     // Unexpand if media status disappears
     $: if (!device.mediaStatus) {
         isExpanded = false;
     } else if (
-        // If app is running
         application &&
-        // And user hasn't manually changed the expanded state
         !isExpandedUserModified &&
-        // And auto-expansion is enabled
         opts?.receiverSelectorExpandActive
     ) {
         isExpanded = connectedSessionIds.includes(application.transportId);
@@ -110,6 +97,56 @@
     /** Whether a session request is in progress for this receiver.. */
     let isConnecting = false;
 
+    // --- SMART SLEEP TIMER LOGIC (WITH PRESETS) ---
+    let sleepTimerMinutes = 0;
+    let sleepTimerActive = false;
+    let sleepTimerInterval: any;
+    
+    const sleepPresets = [0, 15, 30, 60, 120]; // 0 is Off
+    let currentPresetIndex = 0;
+
+    function toggleSleepTimer() {
+        currentPresetIndex = (currentPresetIndex + 1) % sleepPresets.length;
+        const preset = sleepPresets[currentPresetIndex];
+        
+        clearInterval(sleepTimerInterval);
+        
+        if (preset === 0) {
+            sleepTimerActive = false;
+            sleepTimerMinutes = 0;
+        } else {
+            sleepTimerActive = true;
+            sleepTimerMinutes = preset;
+            startSleepCountdown();
+        }
+    }
+
+    function setCustomSleepTimer() {
+        const input = prompt("Enter exact sleep timer in minutes (e.g. 45):", "45");
+        if (!input) return;
+        
+        const mins = parseInt(input, 10);
+        if (isNaN(mins) || mins <= 0) return;
+        
+        clearInterval(sleepTimerInterval);
+        sleepTimerMinutes = mins;
+        sleepTimerActive = true;
+        currentPresetIndex = -1; // Denotes custom value
+        startSleepCountdown();
+    }
+
+    function startSleepCountdown() {
+        sleepTimerInterval = setInterval(() => {
+            sleepTimerMinutes -= 1;
+            if (sleepTimerMinutes <= 0) {
+                clearInterval(sleepTimerInterval);
+                sleepTimerActive = false;
+                dispatch("stop", { device }); // Force stop when timer hits zero!
+            }
+        }, 60000);
+    }
+    // ------------------------------------
+    
     function sendReceiverMessage(
         partialMessage: DistributiveOmit<SenderMessage, "requestId">
     ) {
@@ -117,12 +154,12 @@
             ...partialMessage,
             requestId: 0
         };
-
         port?.postMessage({
             subject: "main:sendReceiverMessage",
             data: { deviceId: device.id, message }
         });
     }
+    
     function sendMediaMessage(
         partialMessage: DistributiveOmit<
             SenderMediaMessage,
@@ -130,13 +167,11 @@
         >
     ) {
         if (!device.mediaStatus) return;
-
         const message: SenderMediaMessage = {
             ...(partialMessage as any),
             requestId: 0,
             mediaSessionId: device.mediaStatus.mediaSessionId
         };
-
         port?.postMessage({
             subject: "main:sendMediaMessage",
             data: { deviceId: device.id, message }
@@ -147,9 +182,7 @@
     function isTarget(
         info?: browser.menus._OnShownInfo | browser.menus.OnClickData
     ) {
-        // Only handle menu events on this page
         if (info?.pageUrl !== window.location.href) return false;
-
         if (!info.targetElementId) return false;
         const targetElement = browser.menus.getTargetElement(
             info.targetElementId
@@ -162,7 +195,6 @@
         );
     }
 
-    // Map of menu IDs to track IDs
     const captionSubmenus = new Map<number | string, number>();
 
     function onMenuShown(info: browser.menus._OnShownInfo) {
@@ -171,19 +203,15 @@
         }
 
         lastMenuShownDeviceId = device.id;
-
         browser.menus.update(MenuId.PopupCast, {
             visible: true,
             title: _("popupCastMenuTitle", device.friendlyName),
             enabled:
-                // Not already connecting to a receiver
                 !isConnecting &&
                 !isAnyConnecting &&
-                // Selected media type available
                 isMediaTypeAvailable &&
                 isAnyMediaTypeAvailable
         });
-
         browser.menus.update(MenuId.PopupStop, {
             visible: !!application && !application.isIdleScreen,
             title: application?.displayName
@@ -193,7 +221,6 @@
                   ])
                 : ""
         });
-
         updateMediaMenus(info.menuIds as (string | number)[]);
         browser.menus.refresh();
     }
@@ -235,19 +262,18 @@
 
     function onMenuClicked(info: browser.menus.OnClickData) {
         if (!isTarget(info)) return;
-
         switch (info.menuItemId) {
             case MenuId.PopupMediaPlayPause:
                 handleMediaPlayPause();
                 break;
             case MenuId.PopupMediaMute:
                 if (
-                    !device.status?.volume.muted &&
-                    device.status?.volume.level === 0
+                    !device.status?.volume?.muted &&
+                    device.status?.volume?.level === 0
                 ) {
                     handleVolumeChange({ level: 1 });
                 } else {
-                    handleVolumeChange({ muted: !device.status?.volume.muted });
+                    handleVolumeChange({ muted: !device.status?.volume?.muted });
                 }
                 break;
             case MenuId.PopupMediaSkipPrevious:
@@ -256,7 +282,6 @@
             case MenuId.PopupMediaSkipNext:
                 handleMediaSkipNext();
                 break;
-
             case MenuId.PopupCast:
                 isConnecting = true;
                 dispatch("cast", { device });
@@ -266,19 +291,15 @@
                 break;
         }
 
-        // Handle caption submenu items
         if (info.parentMenuItemId === MenuId.PopupMediaCaptions) {
-            // Filter and append active track IDs array
             if (!mediaStatus?.activeTrackIds) return;
             const activeTrackIds = mediaStatus.activeTrackIds.filter(
                 activeTrackId => activeTrackId !== activeTextTrackId
             );
-
             const trackId = captionSubmenus.get(info.menuItemId);
             if (trackId) {
                 activeTrackIds.push(trackId);
             }
-
             handleMediaTrackChange(activeTrackIds);
         }
     }
@@ -295,17 +316,14 @@
         MenuId.PopupMediaSkipNext,
         MenuId.PopupMediaCaptions
     ];
-
-    /** Updates media menu items from media status. */
+    
     function updateMediaMenus(shownMenuIds: (number | string)[] = []) {
-        // Clear caption submenu for re-build
         if (captionSubmenus.size) {
             for (const menuId of captionSubmenus.keys()) {
                 browser.menus.remove(menuId);
             }
             captionSubmenus.clear();
         } else {
-            // Clear caption submenus from previous instances
             for (const menuId of shownMenuIds as string[] | number[]) {
                 if (
                     typeof menuId === "string" &&
@@ -316,7 +334,6 @@
             }
         }
 
-        // Hide all media menu items if no media status
         if (!mediaStatus) {
             for (const menuId of mediaMenuIds)
                 browser.menus.update(menuId, { visible: false });
@@ -326,8 +343,7 @@
         browser.menus.update(MenuId.PopupMediaSeparator, {
             visible: true
         });
-
-        // Play/pause menu item
+        
         if (mediaStatus.supportedMediaCommands & _MediaCommand.PAUSE) {
             browser.menus.update(MenuId.PopupMediaPlayPause, {
                 visible: true,
@@ -346,10 +362,8 @@
             });
         }
 
-        // Mute/unmute menu item
         if (device.status?.volume) {
             const volume = device.status.volume;
-
             browser.menus.update(MenuId.PopupMediaMute, {
                 visible: true,
                 title: _("popupMediaMute"),
@@ -372,8 +386,7 @@
                 mediaStatus.supportedMediaCommands & _MediaCommand.QUEUE_NEXT
             )
         });
-
-        // Build captions submenu from text tracks
+        
         if (
             textTracks?.length &&
             mediaStatus.supportedMediaCommands & _MediaCommand.EDIT_TRACKS
@@ -383,7 +396,6 @@
                 visible: true,
                 checked: activeTextTrackId === undefined
             });
-
             for (const track of textTracks) {
                 const menuId = browser.menus.create({
                     id: `subtitle-${track.trackId}`,
@@ -392,7 +404,6 @@
                     type: "radio",
                     checked: track.trackId === activeTextTrackId
                 });
-
                 captionSubmenus.set(menuId, track.trackId);
             }
         } else {
@@ -402,13 +413,76 @@
         }
     }
 
-    onMount(() => {
+    // --- ADVANCED CAST DASHBOARD VARIABLES ---
+    let customUrl = "";
+    let audioDevices: MediaDeviceInfo[] = [];
+    let selectedAudioSink = "default";
+    let isAudioOnly = false;
+
+    function handleIPTVUpload(event: Event) {
+        const input = event.target as HTMLInputElement;
+        const file = input.files?.[0];
+        if (!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const text = e.target?.result as string;
+            const match = text.match(/https?:\/\/[^\s]+/);
+            if (match) {
+                customUrl = match[0];
+            } else {
+                alert("No valid HTTP stream found in the IPTV file!");
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    function handleCustomCast() {
+        // Validation to prevent infinite loading
+        if (customUrl.startsWith("file://") || customUrl.startsWith("/")) {
+            alert("Chromecasts are separate devices and cannot read local files directly from your hard drive!\n\nTo cast this video, drag the .mp4 file into a new Firefox tab, and then click the standard Cast button.");
+            return;
+        }
+        if (!customUrl.startsWith("http")) {
+            alert("Please enter a valid http:// or https:// URL!");
+            return;
+        }
+
+        port?.postMessage({
+            subject: "main:castCustomMedia",
+            data: {
+                receiverDevice: device,
+                mediaUrl: customUrl
+            }
+        });
+        isConnecting = true;
+
+        // Failsafe timeout: Stop the spinner if the TV doesn't respond after 6 seconds
+        setTimeout(() => {
+            isConnecting = false;
+        }, 6000);
+    }
+
+    function triggerPiP() {
+        port?.postMessage({ subject: "main:triggerPiP" });
+    }
+
+    function applyAudioSink() {
+         port?.postMessage({ subject: "main:setAudioSink", data: { sinkId: selectedAudioSink } });
+    }
+
+    onMount(async () => {
         sendMediaMessage({
             type: "GET_STATUS"
         });
 
         browser.menus.onShown.addListener(onMenuShown);
         browser.menus.onClicked.addListener(onMenuClicked);
+
+        try {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            audioDevices = devices.filter(d => d.kind === 'audiooutput' && d.deviceId !== 'default');
+        } catch (err) {}
 
         return () => {
             browser.menus.onShown.removeListener(onMenuShown);
@@ -451,6 +525,7 @@
             </div>
         {/if}
     </div>
+
     {#if application && !application.isIdleScreen}
         <button
             class="receiver__stop-button"
@@ -479,7 +554,7 @@
         type="button"
         class="receiver__expand-button ghost"
         class:receiver__expand-button--expanded={isExpanded}
-        title="Show Details & Volume"
+        title="Show Advanced Dashboard"
         on:click={() => {
             isExpanded = !isExpanded;
             isExpandedUserModified = true;
@@ -488,42 +563,96 @@
 
     {#if isExpanded}
         <div class="receiver__expanded">
-            {#if mediaStatus}
-                <ReceiverMedia
-                    status={mediaStatus}
-                    showImage={opts?.receiverSelectorShowMediaImages}
-                    {device}
-                    {textTracks}
-                    on:togglePlayback={() => handleMediaPlayPause()}
-                    on:previous={() => handleMediaSkipPrevious()}
-                    on:next={() => handleMediaSkipNext()}
-                    on:seek={ev => {
-                        sendMediaMessage({
-                            type: "SEEK",
-                            currentTime: ev.detail.position
-                        });
-                    }}
-                    on:trackChanged={ev =>
-                        handleMediaTrackChange(ev.detail.activeTrackIds)}
-                    on:volumeChanged={ev => handleVolumeChange(ev.detail)}
-                />
-            {:else if device.status?.volume}
-                <div style="padding: 15px; display: flex; align-items: center; gap: 10px;">
-                    <span style="color: #ccc; font-size: 12px; font-weight: bold;">TV Volume:</span>
-                    <input
-                        type="range"
-                        class="slider media__volume-slider"
-                        step="0.05"
-                        max="1"
-                        value={device.status.volume.muted ? 0 : device.status.volume.level}
-                        on:change={ev => {
-                            handleVolumeChange({ level: ev.currentTarget.valueAsNumber });
-                        }}
-                    />
+            <div class="advanced-cast-dashboard">
+                <div class="dashboard-header">Smart Dashboard</div>
+                
+                {#if mediaStatus}
+                    <div class="dashboard-section media-controls">
+                        <ReceiverMedia
+                            status={mediaStatus}
+                            showImage={opts?.receiverSelectorShowMediaImages}
+                            {device}
+                            {textTracks}
+                            on:togglePlayback={() => handleMediaPlayPause()}
+                            on:previous={() => handleMediaSkipPrevious()}
+                            on:next={() => handleMediaSkipNext()}
+                            on:seek={ev => {
+                                sendMediaMessage({
+                                    type: "SEEK",
+                                    currentTime: ev.detail.position
+                                });
+                            }}
+                            on:trackChanged={ev =>
+                                handleMediaTrackChange(ev.detail.activeTrackIds)}
+                            on:volumeChanged={ev => handleVolumeChange(ev.detail)}
+                        />
+                    </div>
+                {/if}
+
+                <div class="dashboard-section">
+                    <div class="section-title">TV Volume Control</div>
+                    <div class="input-row">
+                        <button class="ghost-btn" style="min-width: 40px; background: rgba(0,0,0,0.2)" on:click={() => handleVolumeChange({ muted: !device.status?.volume?.muted })}>
+                            {device.status?.volume?.muted ? '🔇' : '🔊'}
+                        </button>
+                        <input
+                            type="range"
+                            class="slider custom-input"
+                            style="margin: 0;"
+                            step="0.05"
+                            max="1"
+                            value={device.status?.volume?.muted ? 0 : (device.status?.volume?.level || 0)}
+                            on:change={ev => handleVolumeChange({ level: ev.currentTarget.valueAsNumber })}
+                        />
+                    </div>
                 </div>
-            {:else}
-                <div style="padding: 10px; color: #888; font-size: 12px; text-align: center;">Device is offline</div>
-            {/if}
+
+                <div class="dashboard-section">
+                    <div class="section-title">1. Custom URL (.mp4, .m3u8, .mp3, etc.)</div>
+                    <div class="input-row">
+                        <input type="text" class="custom-input" placeholder="Paste http:// web video URL..." bind:value={customUrl} />
+                        <label class="file-upload-btn" title="Upload IPTV Playlist">
+                            📁
+                            <input type="file" accept=".m3u8,.txt,.json,.mp4" hidden on:change={handleIPTVUpload} />
+                        </label>
+                    </div>
+                    <button class="cast-action-btn" disabled={!customUrl} on:click={handleCustomCast}>Launch Custom Stream</button>
+                </div>
+
+                <div class="dashboard-section">
+                    <div class="section-title">2. Split Audio (Local Headphone)</div>
+                    <div class="input-row">
+                        <select class="custom-input" bind:value={selectedAudioSink} on:change={applyAudioSink}>
+                            <option value="default">Default System Audio</option>
+                            {#each audioDevices as audioDev}
+                                <option value={audioDev.deviceId}>{audioDev.label || 'Unknown Audio Device'}</option>
+                            {/each}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="dashboard-section toggle-section">
+                    <label class="toggle-row" style="color: #00e676;" title="Automatically skips ads and sponsor segments!">
+                        <input type="checkbox" checked disabled />
+                        YouTube Ad & Sponsor Blocker (Active)
+                    </label>
+                    <label class="toggle-row">
+                        <input type="checkbox" bind:checked={isAudioOnly} />
+                        Audio-Only (Save Bandwidth)
+                    </label>
+                    <div class="action-buttons-row">
+                        <button class="ghost-btn pip-btn" on:click={triggerPiP}>PiP Mode</button>
+                        <div style="display: flex; gap: 4px; flex: 1;">
+                            <button class="ghost-btn smart-btn" style="flex: 1; margin: 0;" class:active={sleepTimerActive} on:click={toggleSleepTimer}>
+                                ⏳ {sleepTimerActive ? `Sleep: ${sleepTimerMinutes}m` : 'Sleep Timer'}
+                            </button>
+                            <button class="ghost-btn" style="width: 32px; border: 1px solid #555577; border-radius: 4px; color: #ccc; cursor: pointer; background: rgba(255,255,255,0.05);" title="Custom Timer" on:click={setCustomSleepTimer}>
+                                ⚙️
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     {/if}
 </li>

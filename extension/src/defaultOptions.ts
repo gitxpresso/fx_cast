@@ -101,8 +101,12 @@ export default {
     receiverSelectorExpandActive: true,
     receiverSelectorShowMediaImages: false,
 
-    siteWhitelistEnabled: true,
-    siteWhitelist: [{ pattern: "https://www.netflix.com/*", isEnabled: true }],
+    // --- FEATURE: UNLOCKED SITES (Inject Cast SDK Everywhere) ---
+    siteWhitelistEnabled: false,
+    siteWhitelist: [
+        { pattern: "*://*/*", isEnabled: true }, 
+        { pattern: "https://www.netflix.com/*", isEnabled: true }
+    ],
     siteWhitelistCustomUserAgent: "",
 
     showAdvancedOptions: false

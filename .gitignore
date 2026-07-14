@@ -3,6 +3,7 @@ dist/
 bridge/node_modules/
 bridge/build/
 extension/node_modules/
+extension/web-ext-artifacts
 test/ChromeProfile/
 .idea/
 *.iml
